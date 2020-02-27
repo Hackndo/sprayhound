@@ -42,36 +42,52 @@ class LdapConnection:
     def get_domain(self):
         host_fqdn = socket.getfqdn()
         if "." not in host_fqdn:
-            return RetCode(ERROR_LDAP_NOT_FQDN_DOMAIN)
+            return ERROR_LDAP_NOT_FQDN_DOMAIN
         self.domain = host_fqdn.split('.', 1)[1]
 
     def get_domain_dn(self):
         if not self.domain:
-            ret = self.get_domain()
-            if not ret.success():
-                return ret
+            try:
+                self.get_domain()
+            except Exception as e:
+                self.log.error("Could not get domain name")
+                raise
         if '.' not in self.domain:
-            return RetCode(ERROR_LDAP_NOT_FQDN_DOMAIN)
+            return ERROR_LDAP_NOT_FQDN_DOMAIN
         self.domain_dn = ','.join(['DC=' + part for part in self.domain.split('.')])
 
     def login(self):
         self._get_conn()
         if not self.username or not self.password or not self.domain:
-            return RetCode(ERROR_LDAP_NO_CREDENTIALS)
+            return ERROR_LDAP_NO_CREDENTIALS
         try:
             self.log.debug("Trying bind with {}@{} : {}".format(self.username, self.domain, self.password))
             self._conn.simple_bind_s('{}@{}'.format(self.username, self.domain), self.password)
             self.log.debug("LDAP authentication successful!")
-            return RetCode(ERROR_SUCCESS)
+            return ERROR_SUCCESS
         except ldap.SERVER_DOWN:
-            return RetCode(ERROR_LDAP_SERVICE_UNAVAILABLE, "Service unavailable on {}://{}:{}".format(self.scheme, self.host, self.port))
+            self.log.error("Service unavailable on {}://{}:{}".format(self.scheme, self.host, self.port))
+            raise
         except ldap.INVALID_CREDENTIALS:
-            return RetCode(ERROR_LDAP_CREDENTIALS, "Invalid credentials {}/{}:{}".format(self.domain, self.username, self.password))
+            self.log.error("Invalid credentials {}/{}:{}".format(self.domain, self.username, self.password))
+            raise
 
     def test_credentials(self, username, password):
         self.username = username
         self.password = password
-        return self.login()
+
+        self._get_conn()
+        try:
+            self._conn.simple_bind_s('{}@{}'.format(self.username, self.domain), self.password)
+            return ERROR_SUCCESS
+        except ldap.SERVER_DOWN:
+            self.log.error("Service unavailable on {}://{}:{}".format(self.scheme, self.host, self.port))
+            raise
+        except ldap.INVALID_CREDENTIALS:
+            return ERROR_LDAP_CREDENTIALS
+        except Exception as e:
+            self.log.error("Unexpected error while trying {}:{}".format(username, password))
+            raise
 
     def get_users(self, dispatcher, user=None, disabled=True):
         filters = ["(objectClass=User)"]
@@ -98,9 +114,10 @@ class LdapConnection:
             ]
 
             dispatcher.credentials = results
-            return RetCode(ERROR_SUCCESS)
+            return ERROR_SUCCESS
         except Exception as e:
-            return RetCode(ERROR_UNDEFINED, e)
+            self.log.error("An error occurred while looking for users via LDAP")
+            raise
 
     def get_password_policy(self):
         default_policy_container = self.domain_dn
@@ -111,7 +128,8 @@ class LdapConnection:
             # Load domain-wide policy.
             results = self._conn.search_s(default_policy_container, ldap.SCOPE_BASE)
         except ldap.LDAPError as e:
-            return RetCode(ERROR_UNDEFINED, e)
+            self.log.error("An LDAP error occurred while getting password policy")
+            raise
         self.domain_threshold = int(results[0][1]['lockoutThreshold'][0])
 
         results = self._conn.search_s(granular_policy_container, ldap.SCOPE_ONELEVEL, granular_policy_filter, granular_policy_attribs)
@@ -120,13 +138,14 @@ class LdapConnection:
                 for dest in policy[1]['msDS-PSOAppliesTo']:
                     self.granular_threshold[dest.decode('utf-8')] = int(policy[1]['msDS-LockoutThreshold'][0])
 
-        return RetCode(ERROR_SUCCESS)
+        return ERROR_SUCCESS
 
     def _get_conn(self):
         if self._conn is not None:
-            return RetCode(ERROR_SUCCESS)
+            return ERROR_SUCCESS
         self._conn = ldap.initialize('{}://{}:{}'.format(self.scheme, self.host, self.port))
+        self._conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 3.0)
         self._conn.protocol_version = 3
         self._conn.set_option(ldap.OPT_REFERRALS, 0)
-        return RetCode(ERROR_SUCCESS)
+        return ERROR_SUCCESS
 

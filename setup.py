@@ -24,6 +24,8 @@ setup(
     zip_safe = True,
     license="MIT",
     install_requires=[
+        'neo4j',
+        'python-ldap'
     ],
     python_requires='>=3.6',
     classifiers=(

@@ -28,24 +28,23 @@ class Neo4jConnection:
         self.log = options.log
         self.edge_blacklist = options.edge_blacklist
         self._uri = "bolt://{}:{}".format(options.host, options.port)
-        self._driver = None
+        try:
+            self._driver = self._get_driver()
+        except Exception as e:
+            self.log.error("Failed to connect to Neo4J database")
+            raise
 
     def set_as_owned(self, username, domain):
-        ret = self._get_driver()
-        if not ret.success():
-            return ret
         user = self._format_username(username, domain)
         query = "MATCH (u:User {{name:\"{}\"}}) SET u.owned=True RETURN u.name AS name".format(user)
         result = self._run_query(query)
         if len(result.value()) > 0:
-            return RetCode(ERROR_SUCCESS)
+            return ERROR_SUCCESS
         else:
-            return RetCode(ERROR_NEO4J_NON_EXISTENT_NODE, "Node {} does not exist".format(user))
+            self.log.warn("Node {} does not exist".format(user))
+            return ERROR_NEO4J_NON_EXISTENT_NODE
 
     def bloodhound_analysis(self, username, domain):
-        ret = self._get_driver()
-        if not ret.success():
-            return ret
 
         edges = [
             "MemberOf",
@@ -85,12 +84,12 @@ class Neo4jConnection:
 
                 self.log.debug("Query : {}".format(query))
                 result = tx.run(query)
-        return RetCode(ERROR_SUCCESS) if result.value()[0] > 0 else RetCode(ERROR_NO_PATH)
+        return ERROR_SUCCESS if result.value()[0] > 0 else ERROR_NO_PATH
 
     def clean(self):
         if self._driver is not None:
             self._driver.close()
-        return RetCode(ERROR_SUCCESS)
+        return ERROR_SUCCESS
 
     def _run_query(self, query):
         with self._driver.session() as session:
@@ -98,18 +97,18 @@ class Neo4jConnection:
                 return tx.run(query)
 
     def _get_driver(self):
-        if self._driver is not None:
-            return RetCode(ERROR_SUCCESS)
-
         try:
             self._driver = GraphDatabase.driver(self._uri, auth=(self.user, self.password))
-            return RetCode(ERROR_SUCCESS)
+            return ERROR_SUCCESS
         except AuthError as e:
-            return RetCode(ERROR_NEO4J_CREDENTIALS, e)
+            self.log.error("Neo4j invalid credentials {}:{}".format(self.user, self.password))
+            raise
         except ServiceUnavailable as e:
-            return RetCode(ERROR_NEO4J_SERVICE_UNAVAILABLE, e)
+            self.log.error("Neo4j database unavailable at {}".format(self._uri))
+            raise
         except Exception as e:
-            return RetCode(ERROR_NEO4J_UNEXPECTED, e)
+            self.log.error("An unexpected error occurred while connecting to Neo4J database")
+            raise
 
     @staticmethod
     def _format_username(user, domain):

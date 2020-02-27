@@ -56,15 +56,9 @@ def get_args():
 
 
 def sprayhound_exit(logger, error):
-    if error.error_msg:
-        logger.error(error.error_msg)
-    if error.error_exception:
-        logger.debug("Error : {}".format(error.error_exception))
-    sys.exit(error.error_code)
+    logger.error(error[1])
+    sys.exit(error[0])
 
 
 def sprayhound_error(logger, error):
-    if error.error_msg:
-        logger.error(error.error_msg)
-    if error.error_exception:
-        logger.debug("Error : {}".format(error.error_exception))
+    logger.error(error[1])
