@@ -107,7 +107,7 @@ class Neo4jConnection:
             self.log.error("Neo4j database unavailable at {}".format(self._uri))
             raise
         except Exception as e:
-            self.log.error("An unexpected error occurred while connecting to Neo4J database")
+            self.log.error("An unexpected error occurred while connecting to Neo4J database {} ({}:{})".format(self._uri, self.user, self.password))
             raise
 
     @staticmethod
