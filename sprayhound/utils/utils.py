@@ -37,6 +37,7 @@ def get_args():
     group_ldap.add_argument('-lu', '--ldap-user', dest='ldapuser', action='store', help='LDAP User')
     group_ldap.add_argument('-lp', '--ldap-pass', dest='ldappass', action='store', help='LDAP Password')
     group_ldap.add_argument('-lssl', '--ldap-ssl', dest='ldapssl', action='store_true', help='LDAP over TLS (ldaps)')
+    group_ldap.add_argument('-lpage', '--ldap-page-size', type=int, dest='ldappagesize', default=200, help='LDAP Paging size (Default: 200)')
 
     group_neo4j = parser.add_argument_group('neo4j')
     group_neo4j.add_argument('-nh', '--neo4j-host', dest='neo4jhost', default='127.0.0.1', action='store', help='Neo4J Host (Default: 127.0.0.1)')

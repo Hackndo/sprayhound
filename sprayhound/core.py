@@ -145,7 +145,8 @@ class CLI:
             self.args.ldapuser,
             self.args.ldappass,
             self.args.ldapport,
-            self.args.ldapssl
+            self.args.ldapssl,
+            self.args.ldappagesize
         )
         self.neo4j_options = Neo4jConnection.Options(
             self.args.neo4jhost,

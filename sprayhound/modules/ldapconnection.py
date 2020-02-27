@@ -5,6 +5,7 @@
 
 import socket
 import ldap
+from ldap.controls import SimplePagedResultsControl
 
 from sprayhound.modules.credential import Credential
 from sprayhound.utils.defines import *
@@ -12,13 +13,14 @@ from sprayhound.utils.defines import *
 
 class LdapConnection:
     class Options:
-        def __init__(self, host, domain, username, password, port=None, ssl=False):
+        def __init__(self, host, domain, username, password, port=None, ssl=False, page_size=200):
             self.host = host
             self.domain = domain
             self.username = username
             self.password = password
             self.ssl = ssl
             self.scheme = "ldaps" if self.ssl else "ldap"
+            self.page_size = page_size
             if port is None:
                 self.port = 636 if self.ssl else 389
             else:
@@ -32,6 +34,7 @@ class LdapConnection:
         self.ssl = options.ssl
         self.scheme = options.scheme
         self.port = options.port
+        self.page_size = options.page_size
         self.log = log
         self.domain_dn = None
         self._conn = None
@@ -97,20 +100,23 @@ class LdapConnection:
             filters.append("(!(userAccountControl:1.2.840.113556.1.4.803:=2))")
 
         if len(filters) > 1:
-            filter = '(&' + ''.join(filters) + ')'
+            filters = '(&' + ''.join(filters) + ')'
         else:
-            filter = filters[0]
+            filters = filters[0]
         try:
             self.log.debug("Looking in {}".format(self.domain_dn))
             ldap_attributes = ['samAccountName', 'badPwdCount']
-            res = self._conn.search_s(self.domain_dn, ldap.SCOPE_SUBTREE, filter, ldap_attributes)
+            self.log.debug("Users will be retrieved using paging")
+            res = self.get_paged_users(filters, ldap_attributes)
 
             results = [
                 Credential(
                     samaccountname=entry['sAMAccountName'][0].decode('utf-8'),
                     bad_password_count=int(entry['badPwdCount'][0]),
                     threshold=self.domain_threshold if dn not in self.granular_threshold else self.granular_threshold[dn]
-                ) for dn, entry in res if isinstance(entry, dict) and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$'
+                ) for dn, entry in res
+                if isinstance(entry, dict)
+                   and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$'
             ]
 
             dispatcher.credentials = results
@@ -118,6 +124,40 @@ class LdapConnection:
         except Exception as e:
             self.log.error("An error occurred while looking for users via LDAP")
             raise
+
+    def get_paged_users(self, filters, attributes):
+        pages = 0
+        result = []
+
+        page_control = SimplePagedResultsControl(True, size=self.page_size, cookie='')
+        res = self._conn.search_ext(
+            self.domain_dn,
+            ldap.SCOPE_SUBTREE,
+            filters,
+            attributes,
+            serverctrls=[page_control]
+        )
+
+        while True:
+            pages += 1
+            self.log.debug("Page {} done".format(pages))
+            rtype, rdata, rmsgid, serverctrls = self._conn.result3(res)
+            result.extend(rdata)
+            controls = [ctrl for ctrl in serverctrls if ctrl.controlType == SimplePagedResultsControl.controlType]
+            if not controls:
+                self.log.error('The server ignores RFC 2696 control')
+                break
+            if not controls[0].cookie:
+                break
+            page_control.cookie = controls[0].cookie
+            res = self._conn.search_ext(
+                self.domain_dn,
+                ldap.SCOPE_SUBTREE,
+                filters,
+                attributes,
+                serverctrls=[page_control]
+            )
+        return result
 
     def get_password_policy(self):
         default_policy_container = self.domain_dn
