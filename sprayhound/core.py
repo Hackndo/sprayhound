@@ -103,7 +103,7 @@ class SprayHound:
             elif ret == ERROR_LDAP_SERVICE_UNAVAILABLE:
                 return ret
             else:
-                self.log.debug("{} : {} failed ({})".format(credential.samaccountname, credential.password, ret))
+                self.log.debug("{} : {} failed (Error {}: {})".format(credential.samaccountname, credential.password, ret[0], ret[1]))
 
         answer = "n"
         if len(owned) > 1:
@@ -180,7 +180,7 @@ class CLI:
                 raise
             else:
                 return False
-            
+
 
 def run():
     CLI().run()
