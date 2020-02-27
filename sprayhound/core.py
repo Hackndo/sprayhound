@@ -140,19 +140,19 @@ class CLI:
         self.log = Logger(self.log_options)
 
         self.ldap_options = LdapConnection.Options(
-            self.args.domaincontroller,
+            self.args.domain_controller,
             self.args.domain,
-            self.args.ldapuser,
-            self.args.ldappass,
-            self.args.ldapport,
-            self.args.ldapssl,
-            self.args.ldappagesize
+            self.args.ldap_user,
+            self.args.ldap_pass,
+            self.args.ldap_port,
+            self.args.ldap_ssl,
+            self.args.ldap_page_size
         )
         self.neo4j_options = Neo4jConnection.Options(
-            self.args.neo4jhost,
-            self.args.neo4juser,
-            self.args.neo4jpass,
-            self.args.neo4jport,
+            self.args.neo4j_host,
+            self.args.neo4j_user,
+            self.args.neo4j_pass,
+            self.args.neo4j_port,
             self.log
         )
 
