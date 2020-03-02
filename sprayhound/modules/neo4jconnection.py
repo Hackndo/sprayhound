@@ -29,7 +29,7 @@ class Neo4jConnection:
         self.edge_blacklist = options.edge_blacklist
         self._uri = "bolt://{}:{}".format(options.host, options.port)
         try:
-            self._driver = self._get_driver()
+            self._get_driver()
         except Exception as e:
             self.log.error("Failed to connect to Neo4J database")
             raise
@@ -41,7 +41,6 @@ class Neo4jConnection:
         if len(result.value()) > 0:
             return ERROR_SUCCESS
         else:
-            self.log.warn("Node {} does not exist".format(user))
             return ERROR_NEO4J_NON_EXISTENT_NODE
 
     def bloodhound_analysis(self, username, domain):
@@ -78,7 +77,7 @@ class Neo4jConnection:
             with session.begin_transaction() as tx:
                 query = """
                     MATCH (n:User {{name:\"{}\"}}),(m:Group),p=shortestPath((n)-[r:{}*1..]->(m))
-                    WHERE m.objectsid ENDS WITH "-512" 
+                    WHERE m.objectsid ENDS WITH "-512" OR m.objectid ENDS WITH "-512" 
                     RETURN COUNT(p) AS pathNb
                     """.format(user, '|'.join(effective_edges))
 

@@ -17,6 +17,13 @@ class Credential:
     def set_password(self, password):
         self.password = password
 
+    def is_tested(self, unsafe=False):
+        to_be_tested = True
+        if not unsafe:
+            if self.threshold > 0 and self.threshold - self.bad_password_count <= 1:
+                to_be_tested = False
+        return to_be_tested, self.bad_password_count
+
     def is_valid(self, ldap_connection, unsafe=False):
         if not unsafe:
             if self.threshold > 0 and self.threshold - self.bad_password_count <= 1:

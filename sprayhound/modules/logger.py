@@ -8,6 +8,16 @@ import sys
 
 
 class Logger:
+    DEFAULT  = "\033[0m"
+
+    RED      = "\033[1;31m"
+    GREEN    = "\033[1;32m"
+    YELLOW   = "\033[1;33m"
+    BLUE     = "\033[1;34m"
+    WHITE    = "\033[1;37m"
+
+
+
     class Options:
         def __init__(self, verbosity=0):
             self.verbosity = verbosity
@@ -18,32 +28,32 @@ class Logger:
     def info(self, msg):
         if self._verbosity >= 1:
             msg = "\n    ".join(msg.split("\n"))
-            print("\033[1;34m[*]\033[0m {}".format(msg))
+            print("{}[*]{} {}".format(Logger.BLUE, Logger.DEFAULT, msg))
 
     def debug(self, msg):
         if self._verbosity >= 2:
             msg = "\n    ".join(msg.split("\n"))
-            print("\033[1;37m[*]\033[0m {}".format(msg))
+            print("{}[*]{} {}".format(Logger.WHITE, Logger.DEFAULT, msg))
 
     def warn(self, msg):
         if self._verbosity >= 0:
             msg = "\n    ".join(msg.split("\n"))
-            print("\033[1;33m[!]\033[0m {}".format(msg))
+            print("{}[!]{} {}".format(Logger.YELLOW, Logger.DEFAULT, msg))
 
     def error(self, msg):
         msg = "\n    ".join(msg.split("\n"))
-        print("\033[1;31m[X]\033[0m {}".format(msg), file=sys.stderr)
+        print("{}[X]{} {}".format(Logger.RED, Logger.DEFAULT, msg), file=sys.stderr)
 
     def success(self, msg):
         msg = "\n    ".join(msg.split("\n"))
-        print("\033[1;32m[+]\033[0m {}".format(msg))
+        print("{}[+]{} {}".format(Logger.GREEN, Logger.DEFAULT, msg))
 
     def raw(self, msg):
         print("{}".format(msg), end='')
 
     def input(self, question, answers, default=False):
         if default and default not in answers:
-            raise Exception("Default answer")
+            raise Exception("Default answer not valid")
 
         answer = False
         while not answer or answer not in answers:
@@ -52,7 +62,11 @@ class Logger:
                 answer = default
         return answer.lower()
 
-
     @staticmethod
     def highlight(msg):
-        return "\033[1;33m{}\033[0m".format(msg)
+        return "{}{}{}".format(Logger.YELLOW, msg, Logger.DEFAULT)
+
+    @staticmethod
+    def colorize(msg, color):
+        return "{}{}{}".format(color, msg, Logger.DEFAULT)
+
