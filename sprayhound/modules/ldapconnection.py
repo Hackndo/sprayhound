@@ -116,6 +116,7 @@ class LdapConnection:
                     threshold=self.domain_threshold if dn not in self.granular_threshold else self.granular_threshold[dn]
                 ) for dn, entry in res
                 if isinstance(entry, dict)
+                   and 'badPwdCount' in entry
                    and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$'
             ]
 
