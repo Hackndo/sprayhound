@@ -37,8 +37,9 @@ class Neo4jConnection:
     def set_as_owned(self, username, domain):
         user = self._format_username(username, domain)
         query = "MATCH (u:User {{name:\"{}\"}}) SET u.owned=True RETURN u.name AS name".format(user)
+        self.log.debug("Query : {}".format(query))
         result = self._run_query(query)
-        if len(result.value()) > 0:
+        if len(result) > 0:
             return ERROR_SUCCESS
         else:
             return ERROR_NEO4J_NON_EXISTENT_NODE
@@ -72,6 +73,7 @@ class Neo4jConnection:
         effective_edges = [edge for edge in edges if edge.lower() not in without_edges]
 
         user = self._format_username(username, domain)
+        value = None
 
         with self._driver.session() as session:
             with session.begin_transaction() as tx:
@@ -82,8 +84,8 @@ class Neo4jConnection:
                     """.format(user, '|'.join(effective_edges))
 
                 self.log.debug("Query : {}".format(query))
-                result = tx.run(query)
-        return ERROR_SUCCESS if result.value()[0] > 0 else ERROR_NO_PATH
+                value = tx.run(query).value()
+        return ERROR_SUCCESS if value[0] > 0 else ERROR_NO_PATH
 
     def clean(self):
         if self._driver is not None:
@@ -91,9 +93,12 @@ class Neo4jConnection:
         return ERROR_SUCCESS
 
     def _run_query(self, query):
+        value = None
         with self._driver.session() as session:
             with session.begin_transaction() as tx:
-                return tx.run(query)
+                res = tx.run(query)
+                value = res.value()
+        return value
 
     def _get_driver(self):
         try:
