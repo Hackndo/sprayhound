@@ -29,6 +29,7 @@ def get_args():
     group_credentials.add_argument('-u', '--username', action='store', help="Username")
     group_credentials.add_argument('-U', '--userfile', action='store', help="File containing username list")
     group_credentials.add_argument('-p', '--password', action='store', help="Password")
+    group_credentials.add_argument('-t', '--threshold', action='store', type=int, default=1, help="Number of password left allowed before locked out")
 
     group_ldap = parser.add_argument_group('ldap')
     group_ldap.add_argument('-dc', '--domain-controller', action='store', help='Domain controller')

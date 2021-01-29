@@ -12,7 +12,7 @@ from sprayhound.utils.utils import *
 
 
 class SprayHound:
-    def __init__(self, users, password,
+    def __init__(self, users, password, threshold,
                  ldap_options,
                  neo4j_options,
                  logger_options=Logger.Options(),
@@ -25,6 +25,7 @@ class SprayHound:
         self.credentials = []
         self.users = users
         self.password = password
+        self.threshold = threshold
         self.unsafe = unsafe
 
     def run(self):
@@ -99,7 +100,7 @@ class SprayHound:
     def test_credentials(self):
         owned = []
 
-        testing_nb = len([c.is_tested(self.unsafe) for c in self.credentials if c.is_tested(self.unsafe)[0]])
+        testing_nb = len([c.is_tested(self.threshold, self.unsafe) for c in self.credentials if c.is_tested(self.threshold, self.unsafe)[0]])
 
         self.log.success(Logger.colorize("{} users will be tested".format(testing_nb), Logger.GREEN))
         self.log.success(Logger.colorize("{} users will not be tested".format(len(self.credentials) - testing_nb), Logger.YELLOW))
@@ -109,7 +110,7 @@ class SprayHound:
             return ERROR_SUCCESS
 
         for credential in self.credentials:
-            ret = credential.is_valid(self.ldap, self.unsafe)
+            ret = credential.is_valid(self.ldap, self.threshold, self.unsafe)
             if ret == ERROR_SUCCESS:
                 self.log.success("[  {}  ] {}".format(Logger.colorize("VALID", Logger.GREEN), Logger.highlight("{} : {}").format(credential.samaccountname, credential.password)))
                 owned.append(credential.samaccountname)
@@ -185,11 +186,12 @@ class CLI:
             with open(self.args.userfile, 'r') as f:
                 self.users = [user.strip().lower() for user in f if user.strip() != ""]
         self.password = self.args.password
+        self.threshold = self.args.threshold
 
     def run(self):
         try:
             return SprayHound(
-                self.users, self.password,
+                self.users, self.password, self.threshold,
                 ldap_options=self.ldap_options,
                 neo4j_options=self.neo4j_options,
                 logger_options=self.log_options,
