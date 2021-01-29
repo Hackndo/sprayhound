@@ -84,7 +84,7 @@ class SprayHound:
             if ret != ERROR_SUCCESS:
                 return ret
         else:
-            ret = self.ldap.get_users(self, user=self.users[0], disabled=True)
+            ret = self.ldap.get_users(self, users=self.users, disabled=True)
             if ret != ERROR_SUCCESS:
                 return ret
 

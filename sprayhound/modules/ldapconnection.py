@@ -92,10 +92,15 @@ class LdapConnection:
             self.log.error("Unexpected error while trying {}:{}".format(username, password))
             raise
 
-    def get_users(self, dispatcher, user=None, disabled=True):
+    def get_users(self, dispatcher, users=None, disabled=True):
         filters = ["(objectClass=User)"]
-        if user:
-            filters.append("(samAccountName={})"+format(user.lower()))
+        if users:
+            if len(users) == 1:
+                filters.append("(samAccountName={})".format(users[0].lower()))
+            else:
+                filters.append("(|")
+                filters.append("".join("(samAccountName={})".format(user.lower()) for user in users))
+                filters.append(")")
         if not disabled:
             filters.append("(!(userAccountControl:1.2.840.113556.1.4.803:=2))")
 
