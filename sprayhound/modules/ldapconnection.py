@@ -114,15 +114,13 @@ class LdapConnection:
             self.log.debug("Users will be retrieved using paging")
             res = self.get_paged_users(filters, ldap_attributes)
 
+
             results = [
                 Credential(
                     samaccountname=entry['sAMAccountName'][0].decode('utf-8'),
                     bad_password_count=int(entry['badPwdCount'][0]),
                     threshold=self.domain_threshold if dn not in self.granular_threshold else self.granular_threshold[dn]
-                ) for dn, entry in res
-                if isinstance(entry, dict)
-                   and 'badPwdCount' in entry
-                   and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$'
+                ) for dn, entry in res if isinstance(entry, dict) and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$' and "badPwdCount" in entry
             ]
 
             dispatcher.credentials = results
