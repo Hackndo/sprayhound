@@ -54,7 +54,7 @@ class SprayHound:
 
             try:
                 self.ldap.get_password_policy()
-                self.log.success("Successfully retrieved password policy")
+                self.log.success("Successfully retrieved password policy (Threshold: {})".format(self.ldap.domain_threshold))
             except Exception as e:
                 self.log.error("Failed getting password policy")
                 raise
