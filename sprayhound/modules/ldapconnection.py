@@ -73,6 +73,7 @@ class LdapConnection:
             raise
         except ldap.INVALID_CREDENTIALS:
             self.log.error("Invalid credentials {}/{}:{}".format(self.domain, self.username, self.password))
+            print([self.username])
             raise
 
     def test_credentials(self, username, password):

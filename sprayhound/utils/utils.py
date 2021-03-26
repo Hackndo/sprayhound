@@ -28,7 +28,10 @@ def get_args():
     group_credentials = parser.add_argument_group('credentials')
     group_credentials.add_argument('-u', '--username', action='store', help="Username")
     group_credentials.add_argument('-U', '--userfile', action='store', help="File containing username list")
-    group_credentials.add_argument('-p', '--password', action='store', help="Password")
+    group_credentials_exclu = group_credentials.add_mutually_exclusive_group()
+    group_credentials_exclu.add_argument('-p', '--password', action='store', help="Password")
+    group_credentials_exclu.add_argument('--lower', action='store_true', help="User as pass with lowercase password")
+    group_credentials_exclu.add_argument('--upper', action='store_true', help="User as pass with uppercase password")
     group_credentials.add_argument('-t', '--threshold', action='store', type=int, default=1, help="Number of password left allowed before locked out")
 
     group_ldap = parser.add_argument_group('ldap')
@@ -47,6 +50,8 @@ def get_args():
     group_neo4j.add_argument('-np', '--neo4j-pass', default='neo4j', action='store', help='Neo4J password (Default: neo4j)')
 
     parser.add_argument('--unsafe', action='store_true', help='Enable login tries on almost locked out accounts')
+    parser.add_argument('--force', action='store_true', help='Do not prompt for user confirmation')
+    parser.add_argument('--nocolor', action='store_true', help='Do not use color for output')
 
     parser.add_argument('-v', action='count', default=0, help='Verbosity level (-v or -vv)')
 

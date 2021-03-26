@@ -8,45 +8,56 @@ import sys
 
 
 class Logger:
-    DEFAULT  = "\033[0m"
-
-    RED      = "\033[1;31m"
-    GREEN    = "\033[1;32m"
-    YELLOW   = "\033[1;33m"
-    BLUE     = "\033[1;34m"
-    WHITE    = "\033[1;37m"
+        
 
 
 
     class Options:
-        def __init__(self, verbosity=0):
+        def __init__(self, verbosity=0, nocolor=False):
             self.verbosity = verbosity
+            self.nocolor = nocolor
 
     def __init__(self, options=Options()):
+        if options.nocolor:
+            self.DEFAULT  = ""
+
+            self.RED      = ""
+            self.GREEN    = ""
+            self.YELLOW   = ""
+            self.BLUE     = ""
+            self.WHITE    = ""
+        else:
+            self.DEFAULT  = "\033[0m"
+
+            self.RED      = "\033[1;31m"
+            self.GREEN    = "\033[1;32m"
+            self.YELLOW   = "\033[1;33m"
+            self.BLUE     = "\033[1;34m"
+            self.WHITE    = "\033[1;37m"
         self._verbosity = options.verbosity
 
     def info(self, msg):
         if self._verbosity >= 1:
             msg = "\n    ".join(msg.split("\n"))
-            print("{}[*]{} {}".format(Logger.BLUE, Logger.DEFAULT, msg))
+            print("{}[*]{} {}".format(self.BLUE, self.DEFAULT, msg))
 
     def debug(self, msg):
         if self._verbosity >= 2:
             msg = "\n    ".join(msg.split("\n"))
-            print("{}[*]{} {}".format(Logger.WHITE, Logger.DEFAULT, msg))
+            print("{}[*]{} {}".format(self.WHITE, self.DEFAULT, msg))
 
     def warn(self, msg):
         if self._verbosity >= 0:
             msg = "\n    ".join(msg.split("\n"))
-            print("{}[!]{} {}".format(Logger.YELLOW, Logger.DEFAULT, msg))
+            print("{}[!]{} {}".format(self.YELLOW, self.DEFAULT, msg))
 
     def error(self, msg):
         msg = "\n    ".join(msg.split("\n"))
-        print("{}[X]{} {}".format(Logger.RED, Logger.DEFAULT, msg), file=sys.stderr)
+        print("{}[X]{} {}".format(self.RED, self.DEFAULT, msg), file=sys.stderr)
 
     def success(self, msg):
         msg = "\n    ".join(msg.split("\n"))
-        print("{}[+]{} {}".format(Logger.GREEN, Logger.DEFAULT, msg))
+        print("{}[+]{} {}".format(self.GREEN, self.DEFAULT, msg))
 
     def raw(self, msg):
         print("{}".format(msg), end='')
@@ -62,11 +73,9 @@ class Logger:
                 answer = default
         return answer.lower()
 
-    @staticmethod
-    def highlight(msg):
-        return "{}{}{}".format(Logger.YELLOW, msg, Logger.DEFAULT)
+    def highlight(self, msg):
+        return "{}{}{}".format(self.YELLOW, msg, self.DEFAULT)
 
-    @staticmethod
-    def colorize(msg, color):
-        return "{}{}{}".format(color, msg, Logger.DEFAULT)
+    def colorize(self, msg, color):
+        return "{}{}{}".format(color, msg, self.DEFAULT)
 
