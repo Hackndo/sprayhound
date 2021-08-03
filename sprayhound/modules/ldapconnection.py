@@ -119,9 +119,9 @@ class LdapConnection:
             results = [
                 Credential(
                     samaccountname=entry['sAMAccountName'][0].decode('utf-8'),
-                    bad_password_count=int(entry['badPwdCount'][0]),
+                    bad_password_count=0 if 'badPwdCount' not in entry else int(entry['badPwdCount'][0]),
                     threshold=self.domain_threshold if dn not in self.granular_threshold else self.granular_threshold[dn]
-                ) for dn, entry in res if isinstance(entry, dict) and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$' and "badPwdCount" in entry
+                ) for dn, entry in res if isinstance(entry, dict) and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$'
             ]
 
             dispatcher.credentials = results

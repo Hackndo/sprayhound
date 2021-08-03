@@ -12,7 +12,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="sprayhound",
-    version="0.0.2",
+    version="0.0.3",
     author="Pixis",
     author_email="hackndo@gmail.com",
     description="Password spraying with BloodHound integration",
