@@ -37,6 +37,7 @@ python3 -m pip install sprayhound
 ### From source
 
 ```bash
+sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev
 git clone git@github.com:Hackndo/sprayhound.git
 cd sprayhound
 python3 setup.py install
