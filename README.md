@@ -12,7 +12,7 @@ This library uses [python-ldap](https://www.python-ldap.org/en/python-ldap-3.3.0
 
 | Chapters                                     | Description                                             |
 |----------------------------------------------|---------------------------------------------------------|
-| [Requirements](#requirements)                | Requirements to install lsassy from source              |
+| [Requirements](#requirements)                | Requirements to install sprayhound                      |
 | [Warning](#warning)                          | Before using this tool, read this                       |
 | [Installation](#installation)                | Installation instructions                               |
 | [Usage](#usage)                              | Usage and command lines examples                        |
