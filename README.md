@@ -8,7 +8,7 @@
 Python library to safely password spray in Active Directory, set pwned users as owned in Bloodhound and detect path to Domain Admins
 
 
-This library uses [python-ldap](https://www.python-ldap.org/en/python-ldap-3.3.0/) project for all LDAP operations.
+This library uses [ldap3](https://ldap3.readthedocs.io) project for all LDAP operations.
 
 | Chapters                                     | Description                                             |
 |----------------------------------------------|---------------------------------------------------------|
@@ -136,6 +136,9 @@ sprayhound -u simba -p Pentest123.. -d hackn.lab -dc 10.10.10.1 -lu pixis -lp P4
 
 # All domain users, single password
 sprayhound -p Pentest123.. -d hackn.lab -dc 10.10.10.1 -lu pixis -lp P4ssw0rd
+
+# All domain users, single password, using an account from a trusted domain
+sprayhound -p Pentest123.. -d hackn.lab -dc 10.10.10.1 -lu 'babdcatha.net\Babd' -lp P4ssw0rd
 
 # User as pass on all domain users
 sprayhound -d hackn.lab -dc 10.10.10.1 -lu pixis -lp P4ssw0rd

@@ -4,7 +4,7 @@
 #  https://beta.hackndo.com
 
 import socket
-import ldap
+import ldap3
 from ldap.controls import SimplePagedResultsControl
 
 from sprayhound.modules.credential import Credential
@@ -38,6 +38,7 @@ class LdapConnection:
         self.log = log
         self.domain_dn = None
         self._conn = None
+        self.server = None
         self.domain_threshold = 0
         self.granular_threshold = {}  # keys are policy DNs
         self.get_domain_dn()
@@ -60,37 +61,45 @@ class LdapConnection:
         self.domain_dn = ','.join(['DC=' + part for part in self.domain.split('.')])
 
     def login(self):
-        self._get_conn()
+        self._get_server()
         if not self.username or not self.password or not self.domain:
             return ERROR_LDAP_NO_CREDENTIALS
+
+        if(self.username.find("\\") == -1):
+            self.username = self.domain + "\\" + self.username
+
         try:
-            self.log.debug("Trying bind with {}@{} : {}".format(self.username, self.domain, self.password))
-            self._conn.simple_bind_s('{}@{}'.format(self.username, self.domain), self.password)
+            self.log.debug("Trying bind with {} : {}".format(self.username, self.password))
+            self._conn = ldap3.Connection(self.server, authentication=ldap3.NTLM, user=self.username, password=self.password, auto_referrals=False, raise_exceptions=True)
+            self._conn.bind()
             self.log.debug("LDAP authentication successful!")
             return ERROR_SUCCESS
-        except ldap.SERVER_DOWN:
+        except ldap3.core.exceptions.LDAPSocketOpenError:
             self.log.error("Service unavailable on {}://{}:{}".format(self.scheme, self.host, self.port))
             raise
-        except ldap.INVALID_CREDENTIALS:
+        except ldap3.core.exceptions.LDAPInvalidCredentialsResult:
             self.log.error("Invalid credentials {}/{}:{}".format(self.domain, self.username, self.password))
             print([self.username])
             raise
+
 
     def test_credentials(self, username, password):
         self.username = username
         self.password = password
 
-        self._get_conn()
+        self._get_server()
+
         try:
-            self._conn.simple_bind_s('{}@{}'.format(self.username, self.domain), self.password)
+            self._conn = ldap3.Connection(self.server, authentication=ldap3.NTLM, user=self.domain + "\\" + self.username, password=self.password, auto_referrals=False, raise_exceptions=True)
+            self._conn.bind()
             return ERROR_SUCCESS
-        except ldap.SERVER_DOWN:
+        except ldap3.core.exceptions.LDAPSocketOpenError:
             self.log.error("Service unavailable on {}://{}:{}".format(self.scheme, self.host, self.port))
             raise
-        except ldap.INVALID_CREDENTIALS:
-            return ERROR_LDAP_CREDENTIALS
+        except ldap3.core.exceptions.LDAPInvalidCredentialsResult:
+            ERROR_LDAP_CREDENTIALS
         except Exception as e:
-            self.log.error("Unexpected error while trying {}:{}".format(username, password))
+            self.log.error("Unexpected error while trying {}:{}".format(self.domain + "\\" + self.username, password))
             raise
 
     def get_users(self, dispatcher, users=None, disabled=True):
@@ -115,13 +124,12 @@ class LdapConnection:
             self.log.debug("Users will be retrieved using paging")
             res = self.get_paged_users(filters, ldap_attributes)
 
-
             results = [
                 Credential(
-                    samaccountname=entry['sAMAccountName'][0].decode('utf-8'),
-                    bad_password_count=0 if 'badPwdCount' not in entry else int(entry['badPwdCount'][0]),
-                    threshold=self.domain_threshold if dn not in self.granular_threshold else self.granular_threshold[dn]
-                ) for dn, entry in res if isinstance(entry, dict) and entry['sAMAccountName'][0].decode('utf-8')[-1] != '$'
+                    samaccountname=entry['attributes']['sAMAccountName'],
+                    bad_password_count=0 if 'badPwdCount' not in entry['attributes'] else int(entry['attributes']['badPwdCount']),
+                    threshold=self.domain_threshold if entry['dn'] not in self.granular_threshold else self.granular_threshold[entry['dn']]
+                ) for entry in res if isinstance(entry, dict) and 'attributes' in entry and entry['attributes']['sAMAccountName'][-1] != '$'
             ]
 
             dispatcher.credentials = results
@@ -131,37 +139,20 @@ class LdapConnection:
             raise
 
     def get_paged_users(self, filters, attributes):
-        pages = 0
         result = []
 
-        page_control = SimplePagedResultsControl(True, size=self.page_size, cookie='')
-        res = self._conn.search_ext(
-            self.domain_dn,
-            ldap.SCOPE_SUBTREE,
-            filters,
-            attributes,
-            serverctrls=[page_control]
-        )
+        entry_generator = self._conn.extend.standard.paged_search(search_base = self.domain_dn,
+                                                 search_filter = filters,
+                                                 search_scope = ldap3.SUBTREE,
+                                                 attributes = attributes,
+                                                 paged_size = 5,
+                                                 generator=True)
 
-        while True:
-            pages += 1
-            self.log.debug("Page {} done".format(pages))
-            rtype, rdata, rmsgid, serverctrls = self._conn.result3(res)
-            result.extend(rdata)
-            controls = [ctrl for ctrl in serverctrls if ctrl.controlType == SimplePagedResultsControl.controlType]
-            if not controls:
-                self.log.error('The server ignores RFC 2696 control')
-                break
-            if not controls[0].cookie:
-                break
-            page_control.cookie = controls[0].cookie
-            res = self._conn.search_ext(
-                self.domain_dn,
-                ldap.SCOPE_SUBTREE,
-                filters,
-                attributes,
-                serverctrls=[page_control]
-            )
+        total_entries=0
+        for entry in entry_generator:
+            total_entries += 1
+            result.append(entry)
+
         return result
 
     def get_password_policy(self):
@@ -171,26 +162,24 @@ class LdapConnection:
         granular_policy_attribs = ['msDS-LockoutThreshold', 'msDS-PSOAppliesTo']
         try:
             # Load domain-wide policy.
-            results = self._conn.search_s(default_policy_container, ldap.SCOPE_BASE)
+            self._conn.search(default_policy_container, '(objectClass=*)', search_scope=ldap3.BASE, attributes=[ldap3.ALL_ATTRIBUTES, ldap3.ALL_OPERATIONAL_ATTRIBUTES])
         except ldap.LDAPError as e:
             self.log.error("An LDAP error occurred while getting password policy")
             raise
-        self.domain_threshold = int(results[0][1]['lockoutThreshold'][0])
+        self.domain_threshold = int(self._conn.response[0]['attributes']['lockoutThreshold'])
 
-        results = self._conn.search_s(granular_policy_container, ldap.SCOPE_ONELEVEL, granular_policy_filter, granular_policy_attribs)
-        for policy in results:
-            if len(policy[1]['msDS-PSOAppliesTo']) > 0:
-                for dest in policy[1]['msDS-PSOAppliesTo']:
-                    self.granular_threshold[dest.decode('utf-8')] = int(policy[1]['msDS-LockoutThreshold'][0])
+        #TODO: implement granular policy retrieval
+        #results = self._conn.search_s(granular_policy_container, ldap.SCOPE_ONELEVEL, granular_policy_filter, granular_policy_attribs)
+        #print(results)
+        #for policy in results:
+        #    if len(policy[1]['msDS-PSOAppliesTo']) > 0:
+        #        for dest in policy[1]['msDS-PSOAppliesTo']:
+        #            self.granular_threshold[dest.decode('utf-8')] = int(policy[1]['msDS-LockoutThreshold'][0])
 
         return ERROR_SUCCESS
 
-    def _get_conn(self):
-        if self._conn is not None:
-            return ERROR_SUCCESS
-        self._conn = ldap.initialize('{}://{}:{}'.format(self.scheme, self.host, self.port))
-        self._conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 3.0)
-        self._conn.protocol_version = 3
-        self._conn.set_option(ldap.OPT_REFERRALS, 0)
+    def _get_server(self):
+        self.server = ldap3.Server('{}://{}:{}'.format(self.scheme, self.host, self.port))
+
         return ERROR_SUCCESS
 
