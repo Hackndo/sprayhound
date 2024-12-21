@@ -97,7 +97,7 @@ class LdapConnection:
             self.log.error("Service unavailable on {}://{}:{}".format(self.scheme, self.host, self.port))
             raise
         except ldap3.core.exceptions.LDAPInvalidCredentialsResult:
-            ERROR_LDAP_CREDENTIALS
+            return ERROR_LDAP_CREDENTIALS
         except Exception as e:
             self.log.error("Unexpected error while trying {}:{}".format(self.domain + "\\" + self.username, password))
             raise
