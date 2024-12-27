@@ -5,7 +5,6 @@
 
 import socket
 import ldap3
-from ldap.controls import SimplePagedResultsControl
 
 from sprayhound.modules.credential import Credential
 from sprayhound.utils.defines import *
@@ -163,7 +162,7 @@ class LdapConnection:
         try:
             # Load domain-wide policy.
             self._conn.search(default_policy_container, '(objectClass=*)', search_scope=ldap3.BASE, attributes=[ldap3.ALL_ATTRIBUTES, ldap3.ALL_OPERATIONAL_ATTRIBUTES])
-        except ldap.LDAPError as e:
+        except ldap3.core.exceptions.LDAPException as e:
             self.log.error("An LDAP error occurred while getting password policy")
             raise
         self.domain_threshold = int(self._conn.response[0]['attributes']['lockoutThreshold'])
