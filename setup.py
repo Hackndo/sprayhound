@@ -25,7 +25,7 @@ setup(
     license="MIT",
     install_requires=[
         'neo4j',
-        'python-ldap'
+        'ldap3'
     ],
     python_requires='>=3.6',
     classifiers=(
