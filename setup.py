@@ -12,9 +12,9 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="sprayhound",
-    version="0.0.3",
-    author="Pixis",
-    author_email="hackndo@gmail.com",
+    version="0.0.4",
+    author="pixis",
+    author_email="pixis@hackndo.com",
     description="Password spraying with BloodHound integration",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -33,6 +33,8 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ),
@@ -40,6 +42,5 @@ setup(
         'console_scripts': [
             'sprayhound = sprayhound.core:run',
         ],
-    },
-    test_suite='tests.tests'
+    }
 )

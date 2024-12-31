@@ -9,6 +9,7 @@ ERROR_MISSING_ARGUMENTS             = (1, "")
 ERROR_USER_FILE_NOT_FOUND           = (2, "Users file does not exist")
 ERROR_NO_USER_NO_LDAP               = (3, "Either provide ldap credentials or user(s)")
 ERROR_THRESHOLD                     = (4, "Bad password count reached threshold")
+ERROR_PSO                           = (5, "User is discarded because a PSO is applied")
 
 # Neo4J Errors
 ERROR_NEO4J_CREDENTIALS             = (100, "Neo4j credentials are not valid")
